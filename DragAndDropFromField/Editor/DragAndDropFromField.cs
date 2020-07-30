@@ -57,12 +57,12 @@ public class DragAndDropFromField {
 	static void DoObjectFieldReplacement(Rect position, Rect dropRect, int id, UnityEngine.Object obj, Type objType, SerializedProperty property, ObjectFieldValidator validator, bool allowSceneObjects, GUIStyle style) {
 		if (!position.Contains(Event.current.mousePosition)) return;
 		if (Event.current.button != 0 && Event.current.button != 1) return;
-		var targetObj = obj != null ? obj : property.objectReferenceValue;
+		var targetObj = obj != null ? obj : property != null ? property.objectReferenceValue : null;
 		if (Event.current.type == EventType.MouseDown) {
 			preparedToDrag = targetObj;
 		}
 		else if (Event.current.type == EventType.MouseDrag) {
-			if (targetObj == preparedToDrag) {
+			if (targetObj == preparedToDrag && targetObj != null) {
 				StartDrag(targetObj);
 				preparedToDrag = null;
 			}
