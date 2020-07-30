@@ -1,12 +1,18 @@
-﻿using Harmony;
+using Harmony;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using UnityEditor;
 using UnityEngine;
 
 public class DragAndDropFromField {
+	enum ObjectFieldValidatorOptions { None = 0x0, ExactObjectTypeValidation = 0x1 }
+	delegate UnityEngine.Object ObjectFieldValidator(UnityEngine.Object[] references, Type objType, SerializedProperty property, ObjectFieldValidatorOptions options);
+
+	static HarmonyInstance harmony;
+
 	static void StartDrag(params UnityEngine.Object[] toDrag) {
 		if (DragAndDrop.objectReferences != null && DragAndDrop.objectReferences.Length > 0) return;
 		if (toDrag == null) return;
@@ -25,26 +31,17 @@ public class DragAndDropFromField {
 		DragAndDrop.StartDrag(toDrag.Length == 1 ? ObjectNames.GetDragAndDropTitle(toDrag[0]) : "<Multiple>");
 	}
 
-
-	enum ObjectFieldValidatorOptions {
-		None = 0x0,
-		ExactObjectTypeValidation = 0x1
+	[InitializeOnLoadMethod]
+	static void Init() {
+		ThreadPool.QueueUserWorkItem((_) => Patch());
 	}
-	delegate UnityEngine.Object ObjectFieldValidator(UnityEngine.Object[] references, Type objType, SerializedProperty property, ObjectFieldValidatorOptions options);
 
-	static HarmonyInstance harmony;
-	static MethodInfo doObjectFieldMethod =
+	static void Patch() {
+		MethodInfo doObjectFieldMethod =
 			typeof(UnityEditor.EditorGUI).GetMethods(BindingFlags.Static | BindingFlags.InvokeMethod | BindingFlags.NonPublic | BindingFlags.Public)
 			.Where(m => m.Name == "DoObjectField") // Get the functions with this name
 			.Where(m => m.GetParameters().Any(p => p.ParameterType == typeof(GUIStyle))).FirstOrDefault(); // Filter to get the specific function we want
 
-	[InitializeOnLoadMethod]
-	static void Init() {
-		Patch();
-	}
-
-	static void Patch() {
-		Debug.Log("Patching Object fields to be draggable");
 		if (doObjectFieldMethod == null) {
 			Debug.LogWarning("Can't find the method UnityEditor.EditorGUI.DoObjectField(). Patching won't be done.");
 			return;
@@ -56,11 +53,19 @@ public class DragAndDropFromField {
 		harmony.Patch(doObjectFieldMethod, prefix: new HarmonyMethod(typeof(DragAndDropFromField), "DoObjectFieldReplacement"));
 	}
 
+	static UnityEngine.Object preparedToDrag;
 	static void DoObjectFieldReplacement(Rect position, Rect dropRect, int id, UnityEngine.Object obj, Type objType, SerializedProperty property, ObjectFieldValidator validator, bool allowSceneObjects, GUIStyle style) {
 		if (!position.Contains(Event.current.mousePosition)) return;
-		if (Event.current.type != EventType.MouseDrag) return;
 		if (Event.current.button != 0 && Event.current.button != 1) return;
-
-		StartDrag(obj != null ? obj : property.objectReferenceValue);
+		var targetObj = obj != null ? obj : property.objectReferenceValue;
+		if (Event.current.type == EventType.MouseDown) {
+			preparedToDrag = targetObj;
+		}
+		else if (Event.current.type == EventType.MouseDrag) {
+			if (targetObj == preparedToDrag) {
+				StartDrag(targetObj);
+				preparedToDrag = null;
+			}
+		}
 	}
 }
