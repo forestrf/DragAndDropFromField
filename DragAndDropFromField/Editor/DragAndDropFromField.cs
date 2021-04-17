@@ -40,7 +40,8 @@ public class DragAndDropFromField {
 		MethodInfo doObjectFieldMethod =
 			typeof(UnityEditor.EditorGUI).GetMethods(BindingFlags.Static | BindingFlags.InvokeMethod | BindingFlags.NonPublic | BindingFlags.Public)
 			.Where(m => m.Name == "DoObjectField") // Get the functions with this name
-			.Where(m => m.GetParameters().Any(p => p.ParameterType == typeof(GUIStyle))).FirstOrDefault(); // Filter to get the specific function we want
+			.OrderByDescending(m => m.GetParameters().Length) // Filter to get the specific function we want
+			.FirstOrDefault();
 
 		if (doObjectFieldMethod == null) {
 			Debug.LogWarning("Can't find the method UnityEditor.EditorGUI.DoObjectField(). Patching won't be done.");
@@ -54,7 +55,11 @@ public class DragAndDropFromField {
 	}
 
 	static UnityEngine.Object preparedToDrag;
+#if UNITY_2020_1_OR_NEWER
+	static void DoObjectFieldReplacement(Rect position, Rect dropRect, int id, UnityEngine.Object obj, UnityEngine.Object objBeingEdited, Type objType, SerializedProperty property, ObjectFieldValidator validator, bool allowSceneObjects, GUIStyle style) {
+#else
 	static void DoObjectFieldReplacement(Rect position, Rect dropRect, int id, UnityEngine.Object obj, Type objType, SerializedProperty property, ObjectFieldValidator validator, bool allowSceneObjects, GUIStyle style) {
+#endif
 		if (!position.Contains(Event.current.mousePosition)) return;
 		if (Event.current.button != 0 && Event.current.button != 1) return;
 		var targetObj = obj != null ? obj : property != null ? property.objectReferenceValue : null;
