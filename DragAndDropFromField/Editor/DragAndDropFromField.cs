@@ -63,6 +63,7 @@ public class DragAndDropFromField {
 		if (!position.Contains(Event.current.mousePosition)) return;
 		if (Event.current.button != 0 && Event.current.button != 1) return;
 		var targetObj = obj != null ? obj : property != null ? property.objectReferenceValue : null;
+		if (targetObj is Transform t) targetObj = t.gameObject; // Only GameObjects can resolve to other types
 		if (Event.current.type == EventType.MouseDown) {
 			preparedToDrag = targetObj;
 		}
